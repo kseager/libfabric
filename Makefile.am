@@ -43,7 +43,8 @@ common_srcs = \
 	prov/util/src/util_poll.c   \
 	prov/util/src/util_wait.c   \
 	prov/util/src/util_buf.c    \
-	prov/util/src/util_mr.c	
+	prov/util/src/util_mr.c	    \
+	prov/util/src/util_mr_rbt.c	
 
 # ensure dl-built providers link back to libfabric
 linkback = $(top_builddir)/src/libfabric.la

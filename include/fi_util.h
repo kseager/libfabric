@@ -323,27 +323,24 @@ int fi_eq_create(struct fid_fabric *fabric, struct fi_eq_attr *attr,
  * MR
  */
 
+/* USER UTIL MR DS API CALLS */
 /* Data structure abstraction -- always going to need map like DS */
 
-/*need better solution... */
-typedef RbtStatus ds_status;
-typedef void *util_mr_itr;
-typedef struct fi_mr_attr util_mr_item_t; /*hide addr related info & store prov_mr ptr */
-
-struct fi_ops_util_ds {
-    void (*return_keyvalue) (void *ds_handle, void *ds_itr, void **key, 
+extern void * util_ds_init(int(*Compare)(void *a, void *b));
+extern void util_ds_return_keyvalue(void *ds_handle, void *ds_itr, void **key, 
                             void **value);
-    void * (*find) (void * ds_handle, void *key);
-    ds_status (*insert) (void *ds_handle, void *key, void *value);
-    ds_status (*erase) (void * ds_handle, void * ds_itr);
-    void (*delete_ds) (void * ds_handle);
-};
+extern void * util_ds_find(void * ds_handle, void *key);
+extern int util_ds_insert(void *ds_handle, void *key, void *value);
+extern int util_ds_erase(void * ds_handle, void * ds_itr);
+extern void util_ds_delete_ds(void * ds_handle);
 
 /* USER UTIL MR API CALLS */
+typedef void *util_mr_itr;
+/*hide addr related info & store prov_mr ptr */
+typedef struct fi_mr_attr util_mr_item_t; 
 
 struct util_mr {
     void *ds_handle;
-    struct fi_ops_util_ds * ds_ops; /* rbt_ops? */
     uint64_t b_key; /* track available key (BASIC usage) */
     enum fi_mr_mode mr_type;
 };

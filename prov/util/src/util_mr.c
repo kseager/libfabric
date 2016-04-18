@@ -103,14 +103,14 @@ int ofi_mr_insert(struct util_mr * in_mr_h, const struct fi_mr_attr *in_attr,
     if(in_mr_h->mr_type == FI_MR_SCALABLE) {
         item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base + in_attr->offset;
         /* verify key doesn't already exist */
-        if(in_mr_h->ds_ops->find(in_mr_h->ds_handle, (void *)item->requested_key))
+        if(util_ds_find(in_mr_h->ds_handle, (void *)item->requested_key))
                 return -FI_EINVAL;
     } else {
         item->requested_key = get_mr_key((*in_mr_h));
         item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base;
     }
 
-    in_mr_h->ds_ops->insert(in_mr_h->ds_handle, (void *)item->requested_key, item);   
+    util_ds_insert(in_mr_h->ds_handle, (void *)item->requested_key, item);   
     *out_key = item->requested_key; 
 
     return 0;
@@ -124,12 +124,12 @@ int ofi_mr_retrieve(struct util_mr * in_mr_h, ssize_t in_len,
     util_mr_itr itr;
     util_mr_item_t * item;
     
-    itr = in_mr_h->ds_ops->find(in_mr_h->ds_handle, (void *)in_key);
+    itr = util_ds_find(in_mr_h->ds_handle, (void *)in_key);
 
     if(!itr)
         return -FI_EINVAL; 
 
-    in_mr_h->ds_ops->return_keyvalue(in_mr_h->ds_handle, itr, (void **)&in_key, 
+    util_ds_return_keyvalue(in_mr_h->ds_handle, itr, (void **)&in_key, 
                                 (void **) &item);
 
     /*return providers MR struct */
@@ -147,33 +147,23 @@ int ofi_mr_erase(struct util_mr * in_mr_h, uint64_t in_key, void ** out_prov_mr)
     util_mr_itr itr;
     util_mr_item_t * item;
     
-    itr = in_mr_h->ds_ops->find(in_mr_h->ds_handle, (void *)in_key);
+    itr = util_ds_find(in_mr_h->ds_handle, (void *)in_key);
 
     if(!itr)
         return -FI_EINVAL; 
 
     /*release memory */
-    in_mr_h->ds_ops->return_keyvalue(in_mr_h->ds_handle, itr, (void **)&in_key, 
+    util_ds_return_keyvalue(in_mr_h->ds_handle, itr, (void **)&in_key, 
                                 (void **) &item);
 
     *out_prov_mr = item->context; /* user should free this item */
     free((void *)item->mr_iov);
     free(item); 
 
-    in_mr_h->ds_ops->erase(in_mr_h->ds_handle, itr);
+    util_ds_erase(in_mr_h->ds_handle, itr);
 
     return 0;
 }
-
-
-/* RBT data structure static init */
-static struct fi_ops_util_ds rbt_ops = {
-    .return_keyvalue = rbtKeyValue,
-    .find = rbtFind,
-    .insert = rbtInsert,
-    .erase = rbtErase, 
-    .delete_ds = rbtDelete, 
-};
 
 /*assumes uint64_t keys */
 static int compare_mr_keys(void *key1, void *key2)
@@ -191,9 +181,7 @@ struct util_mr * util_mr_init(enum fi_mr_mode mode)
     /* FI_MR_SCALABLE vs FI_MR_BASIC */
     new_mr->mr_type = mode; 
 
-    /*create DS instance TODO-abstract out? */
-    new_mr->ds_handle = rbtNew(compare_mr_keys);
-    new_mr->ds_ops = &rbt_ops;
+    new_mr->ds_handle = util_ds_init(compare_mr_keys); 
     
     new_mr->b_key = 0;
 
@@ -203,7 +191,7 @@ struct util_mr * util_mr_init(enum fi_mr_mode mode)
 
 int util_mr_close(struct util_mr ** in_mr_h)
 {
-    (*in_mr_h)->ds_ops->delete_ds((*in_mr_h)->ds_handle);
+    util_ds_delete_ds((*in_mr_h)->ds_handle);
     free(*in_mr_h);
 
     return 0;
