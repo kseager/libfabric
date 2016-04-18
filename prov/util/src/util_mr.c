@@ -65,30 +65,6 @@ static inline uint64_t get_mr_key(struct util_mr mr_h)
     return b_key;        
 }
 
-int util_mr_insert_basic(struct util_mr in_mr_h, 
-                                const struct fi_mr_attr *in_attr,
-                                uint64_t * out_key, void * in_prov_mr)
-{ 
-    util_mr_item_t * item;
-
-    if (!in_attr || in_attr->iov_count <= 0 || !in_prov_mr) {
-        return -FI_EINVAL;
-    }
-   
-    item = create_mr_attr_copy(in_attr, in_prov_mr); 
-
-    /* Basic MR  handling */
-    item->requested_key = get_mr_key(in_mr_h);
-    item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base;
-
-    in_mr_h.ds_ops->insert(in_mr_h.ds_handle, &item->requested_key, item);   
-   
-    *out_key = item->requested_key; 
-
-    return 0; 
-}
-
-
 static inline int verify_addr(util_mr_item_t * item, uint64_t in_access, 
                                  uint64_t in_addr, ssize_t in_len)
 {
@@ -110,33 +86,9 @@ static inline int verify_addr(util_mr_item_t * item, uint64_t in_access,
     return -FI_EACCES;
 }
 
-int util_mr_retrieve_basic(struct util_mr in_mr_h, ssize_t in_len,
-                                void * in_addr, uint64_t in_key, 
-                                uint64_t in_access, void **out_prov_mr)
-{ 
-    /*grab info */
-    util_mr_itr itr;
-    util_mr_item_t * item;
-    
-    itr = in_mr_h.ds_ops->find(in_mr_h.ds_handle, (void *)in_key);
-
-    if(!itr)
-        return -FI_EINVAL; 
-
-    in_mr_h.ds_ops->return_keyvalue(in_mr_h.ds_handle, itr, (void **)&in_key, 
-                                (void **) &item);
-
-    /*return providers MR struct */
-    (*out_prov_mr) = item->context;
-
-    return verify_addr(item, in_access, (uint64_t)in_addr, in_len);
-
-} 
-
 /*PSM is assuming attr already has offset calculated in, socket opposite */
 /* use requested key, need to offset entry */
-int util_mr_insert_scalable(struct util_mr in_mr_h, 
-                                const struct fi_mr_attr *in_attr, 
+int util_mr_insert(struct util_mr in_mr_h, const struct fi_mr_attr *in_attr, 
                                 uint64_t * out_key, void * in_prov_mr)
 {
     util_mr_item_t * item; 
@@ -148,22 +100,23 @@ int util_mr_insert_scalable(struct util_mr in_mr_h,
     item = create_mr_attr_copy(in_attr, in_prov_mr);
 
     /* Scalable MR handling */
-    item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base + in_attr->offset;
-
+    if(in_mr_h.mr_type == FI_MR_SCALABLE) {
+        item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base + in_attr->offset;
     /* verify key doesn't already exist */
-    if(in_mr_h.ds_ops->find(in_mr_h.ds_handle, (void *)item->requested_key))
-            return -FI_EINVAL;
+        if(in_mr_h.ds_ops->find(in_mr_h.ds_handle, (void *)item->requested_key))
+                return -FI_EINVAL;
+    } else {
+        item->requested_key = get_mr_key(in_mr_h);
+        item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base;
+    }
 
     in_mr_h.ds_ops->insert(in_mr_h.ds_handle, (void *)item->requested_key, item);   
-    /*(-) TODO offset in PSM....maybe it doesn't matter as long as consistant? */
-    //item.offset = (uintptr_t) in_attr->mr_iov[0].iov_base + in_attr->offset;
-    
     *out_key = item->requested_key; 
 
     return 0;
 }
 
-int util_mr_retrieve_scalable(struct util_mr in_mr_h, ssize_t in_len,
+int util_mr_retrieve(struct util_mr in_mr_h, ssize_t in_len,
                                 void * in_addr, uint64_t in_key, 
                                 uint64_t in_access, void **out_prov_mr)
 {
@@ -183,7 +136,8 @@ int util_mr_retrieve_scalable(struct util_mr in_mr_h, ssize_t in_len,
     (*out_prov_mr) = item->context;
 
     /*offset for scalable */
-    in_addr = (char *)in_addr + item->offset;
+    if(in_mr_h.mr_type == FI_MR_SCALABLE) 
+        in_addr = (char *)in_addr + item->offset;
 
     return verify_addr(item, in_access, (uint64_t)in_addr, in_len);
 }
@@ -230,31 +184,12 @@ static int compare_mr_keys(void *key1, void *key2)
 }
 
 
-/* MR_BASIC data structure init */
-static struct fi_ops_util_mr mr_basic_ops = {
-    .size = sizeof(struct fi_ops_util_mr),
-    .insert = util_mr_insert_basic,
-    .retrieve = util_mr_retrieve_basic,
-    .erase = util_mr_erase,
-};
-
-/* MR_SCALABLE data structure init */
-static struct fi_ops_util_mr mr_scalable_ops = {
-    .size = sizeof(struct fi_ops_util_mr),
-    .insert = util_mr_insert_scalable,
-    .retrieve = util_mr_retrieve_scalable,
-    .erase = util_mr_erase,
-};
-
-
 struct util_mr * util_mr_init(enum fi_mr_mode mode)
 {
     struct util_mr * new_mr = malloc(sizeof(struct util_mr)); /*dc*/
-    if(mode == FI_MR_SCALABLE) {
-        new_mr->mr_ops = &mr_scalable_ops;
-    } else {
-        new_mr->mr_ops = &mr_basic_ops;
-    }
+
+    /* FI_MR_SCALABLE vs FI_MR_BASIC */
+    new_mr->mr_type = mode; 
 
     /*create DS instance TODO-abstract out? */
     new_mr->ds_handle = rbtNew(compare_mr_keys);

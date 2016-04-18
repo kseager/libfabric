@@ -344,25 +344,19 @@ struct fi_ops_util_ds {
 struct util_mr {
     void *ds_handle;
     struct fi_ops_util_ds * ds_ops; /* rbt_ops? */
-    struct fi_ops_util_mr * mr_ops;
     uint64_t b_key; /* track available key (BASIC usage) */
-};
-
-/*util_mr: interface encapsulating MR data structure choice */
-struct fi_ops_util_mr {
-    size_t size;/*TODO */
-    /*copy/verify info, and insert, TODO verify addrs and if already inserted? */
-    int (*insert) (struct util_mr in_mr_h, 
-                            const struct fi_mr_attr *in_attr, 
-                            uint64_t * out_key, void * in_prov_mr); 
-    /*return address if SCALABLE, verify access */
-    int (*retrieve) (struct util_mr in_mr_h, ssize_t in_len,
-                            void *in_addr, uint64_t in_key, 
-                            uint64_t in_access, void **out_prov_mr);
-    int (*erase) (struct util_mr in_mr_h, uint64_t in_key, void ** out_prov_mr);
+    enum fi_mr_mode mr_type;
 };
 
 extern struct util_mr * util_mr_init(enum fi_mr_mode mode);
+extern int util_mr_insert(struct util_mr in_mr_h, 
+                                const struct fi_mr_attr *in_attr, 
+                                uint64_t * out_key, void * in_prov_mr);
+extern int util_mr_retrieve(struct util_mr in_mr_h, ssize_t in_len,
+                                void * in_addr, uint64_t in_key, 
+                                uint64_t in_access, void **out_prov_mr);
+extern int util_mr_erase(struct util_mr in_mr_h, uint64_t in_key, 
+                            void ** out_prov_mr);
 extern int util_mr_close(struct util_mr * in_mr_h);
 
 
