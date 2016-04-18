@@ -326,13 +326,13 @@ int fi_eq_create(struct fid_fabric *fabric, struct fi_eq_attr *attr,
 /* USER UTIL MR DS API CALLS */
 /* Data structure abstraction -- always going to need map like DS */
 
-extern void * util_ds_init(int(*Compare)(void *a, void *b));
-extern void util_ds_return_keyvalue(void *ds_handle, void *ds_itr, void **key, 
+extern void * util_map_init(int(*Compare)(void *a, void *b));
+extern void util_map_return_keyvalue(void *map_handle, void *map_itr, void **key, 
                             void **value);
-extern void * util_ds_find(void * ds_handle, void *key);
-extern int util_ds_insert(void *ds_handle, void *key, void *value);
-extern int util_ds_erase(void * ds_handle, void * ds_itr);
-extern void util_ds_delete_ds(void * ds_handle);
+extern void * util_map_find(void * map_handle, void *key);
+extern int util_map_insert(void *map_handle, void *key, void *value);
+extern int util_map_erase(void * map_handle, void * map_itr);
+extern void util_map_delete_map(void * map_handle);
 
 /* USER UTIL MR API CALLS */
 typedef void *util_mr_itr;
@@ -340,7 +340,7 @@ typedef void *util_mr_itr;
 typedef struct fi_mr_attr util_mr_item_t; 
 
 struct util_mr {
-    void *ds_handle;
+    void *map_handle;
     uint64_t b_key; /* track available key (BASIC usage) */
     enum fi_mr_mode mr_type;
 };
