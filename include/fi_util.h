@@ -348,16 +348,16 @@ struct util_mr {
     enum fi_mr_mode mr_type;
 };
 
-extern struct util_mr * util_mr_init(enum fi_mr_mode mode);
-extern int util_mr_insert(struct util_mr in_mr_h, 
+extern struct util_mr * ofi_mr_init(enum fi_mr_mode mode);
+extern int ofi_mr_insert(struct util_mr * in_mr_h, 
                                 const struct fi_mr_attr *in_attr, 
                                 uint64_t * out_key, void * in_prov_mr);
-extern int util_mr_retrieve(struct util_mr in_mr_h, ssize_t in_len,
+extern int ofi_mr_retrieve(struct util_mr * in_mr_h, ssize_t in_len,
                                 void * in_addr, uint64_t in_key, 
                                 uint64_t in_access, void **out_prov_mr);
-extern int util_mr_erase(struct util_mr in_mr_h, uint64_t in_key, 
+extern int ofi_mr_erase(struct util_mr * in_mr_h, uint64_t in_key, 
                             void ** out_prov_mr);
-extern int util_mr_close(struct util_mr * in_mr_h);
+extern int ofi_mr_close(struct util_mr ** in_mr_h);
 
 
 

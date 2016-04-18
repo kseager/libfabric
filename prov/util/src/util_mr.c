@@ -88,7 +88,7 @@ static inline int verify_addr(util_mr_item_t * item, uint64_t in_access,
 
 /*PSM is assuming attr already has offset calculated in, socket opposite */
 /* use requested key, need to offset entry */
-int util_mr_insert(struct util_mr in_mr_h, const struct fi_mr_attr *in_attr, 
+int ofi_mr_insert(struct util_mr * in_mr_h, const struct fi_mr_attr *in_attr, 
                                 uint64_t * out_key, void * in_prov_mr)
 {
     util_mr_item_t * item; 
@@ -100,23 +100,23 @@ int util_mr_insert(struct util_mr in_mr_h, const struct fi_mr_attr *in_attr,
     item = create_mr_attr_copy(in_attr, in_prov_mr);
 
     /* Scalable MR handling */
-    if(in_mr_h.mr_type == FI_MR_SCALABLE) {
+    if(in_mr_h->mr_type == FI_MR_SCALABLE) {
         item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base + in_attr->offset;
-    /* verify key doesn't already exist */
-        if(in_mr_h.ds_ops->find(in_mr_h.ds_handle, (void *)item->requested_key))
+        /* verify key doesn't already exist */
+        if(in_mr_h->ds_ops->find(in_mr_h->ds_handle, (void *)item->requested_key))
                 return -FI_EINVAL;
     } else {
-        item->requested_key = get_mr_key(in_mr_h);
+        item->requested_key = get_mr_key((*in_mr_h));
         item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base;
     }
 
-    in_mr_h.ds_ops->insert(in_mr_h.ds_handle, (void *)item->requested_key, item);   
+    in_mr_h->ds_ops->insert(in_mr_h->ds_handle, (void *)item->requested_key, item);   
     *out_key = item->requested_key; 
 
     return 0;
 }
 
-int util_mr_retrieve(struct util_mr in_mr_h, ssize_t in_len,
+int ofi_mr_retrieve(struct util_mr * in_mr_h, ssize_t in_len,
                                 void * in_addr, uint64_t in_key, 
                                 uint64_t in_access, void **out_prov_mr)
 {
@@ -124,43 +124,43 @@ int util_mr_retrieve(struct util_mr in_mr_h, ssize_t in_len,
     util_mr_itr itr;
     util_mr_item_t * item;
     
-    itr = in_mr_h.ds_ops->find(in_mr_h.ds_handle, (void *)in_key);
+    itr = in_mr_h->ds_ops->find(in_mr_h->ds_handle, (void *)in_key);
 
     if(!itr)
         return -FI_EINVAL; 
 
-    in_mr_h.ds_ops->return_keyvalue(in_mr_h.ds_handle, itr, (void **)&in_key, 
+    in_mr_h->ds_ops->return_keyvalue(in_mr_h->ds_handle, itr, (void **)&in_key, 
                                 (void **) &item);
 
     /*return providers MR struct */
     (*out_prov_mr) = item->context;
 
     /*offset for scalable */
-    if(in_mr_h.mr_type == FI_MR_SCALABLE) 
+    if(in_mr_h->mr_type == FI_MR_SCALABLE) 
         in_addr = (char *)in_addr + item->offset;
 
     return verify_addr(item, in_access, (uint64_t)in_addr, in_len);
 }
 
-int util_mr_erase(struct util_mr in_mr_h, uint64_t in_key, void ** out_prov_mr)
+int ofi_mr_erase(struct util_mr * in_mr_h, uint64_t in_key, void ** out_prov_mr)
 {
     util_mr_itr itr;
     util_mr_item_t * item;
     
-    itr = in_mr_h.ds_ops->find(in_mr_h.ds_handle, (void *)in_key);
+    itr = in_mr_h->ds_ops->find(in_mr_h->ds_handle, (void *)in_key);
 
     if(!itr)
         return -FI_EINVAL; 
 
     /*release memory */
-    in_mr_h.ds_ops->return_keyvalue(in_mr_h.ds_handle, itr, (void **)&in_key, 
+    in_mr_h->ds_ops->return_keyvalue(in_mr_h->ds_handle, itr, (void **)&in_key, 
                                 (void **) &item);
 
     *out_prov_mr = item->context; /* user should free this item */
     free((void *)item->mr_iov);
     free(item); 
 
-    in_mr_h.ds_ops->erase(in_mr_h.ds_handle, itr);
+    in_mr_h->ds_ops->erase(in_mr_h->ds_handle, itr);
 
     return 0;
 }
@@ -201,10 +201,10 @@ struct util_mr * util_mr_init(enum fi_mr_mode mode)
 }
 
 
-int util_mr_close(struct util_mr * in_mr_h)
+int util_mr_close(struct util_mr ** in_mr_h)
 {
-    in_mr_h->ds_ops->delete_ds(in_mr_h->ds_handle);
-    free(in_mr_h);
+    (*in_mr_h)->ds_ops->delete_ds((*in_mr_h)->ds_handle);
+    free(*in_mr_h);
 
     return 0;
 }
