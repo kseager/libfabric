@@ -57,11 +57,11 @@ static inline util_mr_item_t * create_mr_attr_copy(
     return item; 
 }
 
-static inline uint64_t get_mr_key(struct util_mr mr_h)
+static inline uint64_t get_mr_key(struct util_mr *mr_h)
 {
-    assert(mr_h.b_key != UINT64_MAX);
-    uint64_t b_key = mr_h.b_key;
-    mr_h.b_key++;
+    assert(mr_h->b_key != UINT64_MAX);
+    uint64_t b_key = mr_h->b_key;
+    mr_h->b_key++;
     return b_key;        
 }
 
@@ -103,28 +103,31 @@ int ofi_mr_insert(struct util_mr * in_mr_h, const struct fi_mr_attr *in_attr,
     if(in_mr_h->mr_type == FI_MR_SCALABLE) {
         item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base + in_attr->offset;
         /* verify key doesn't already exist */
-        if(util_map_find(in_mr_h->map_handle, (void *)item->requested_key))
+        if(util_map_find(in_mr_h->map_handle, &item->requested_key))
                 return -FI_EINVAL;
     } else {
-        item->requested_key = get_mr_key((*in_mr_h));
+        item->requested_key = get_mr_key(in_mr_h);
         item->offset = (uintptr_t) in_attr->mr_iov[0].iov_base;
     }
 
-    util_map_insert(in_mr_h->map_handle, (void *)item->requested_key, item);   
+    util_map_insert(in_mr_h->map_handle, &item->requested_key, item);   
     *out_key = item->requested_key; 
 
     return 0;
 }
 
 int ofi_mr_retrieve(struct util_mr * in_mr_h, ssize_t in_len,
-                                void * in_addr, uint64_t in_key, 
+                                uintptr_t *io_addr, uint64_t in_key, 
                                 uint64_t in_access, void **out_prov_mr)
 {
     /*grab info */
     util_mr_itr itr;
     util_mr_item_t * item;
-    
-    itr = util_map_find(in_mr_h->map_handle, (void *)in_key);
+    int err = 0;  
+ 
+    assert(io_addr);
+
+    itr = util_map_find(in_mr_h->map_handle, &in_key);
 
     if(!itr)
         return -FI_EINVAL; 
@@ -133,21 +136,31 @@ int ofi_mr_retrieve(struct util_mr * in_mr_h, ssize_t in_len,
                                 (void **) &item);
 
     /*return providers MR struct */
+    if(!item)
+        return -FI_EINVAL; /*which error code? TODO */
+
     (*out_prov_mr) = item->context;
+
+    err = verify_addr(item, in_access, *io_addr, in_len);
+    if(err)
+       return err;
 
     /*offset for scalable */
     if(in_mr_h->mr_type == FI_MR_SCALABLE) 
-        in_addr = (char *)in_addr + item->offset;
+        *io_addr = (*io_addr) + item->offset;
 
-    return verify_addr(item, in_access, (uint64_t)in_addr, in_len);
+    return 0; 
 }
 
-int ofi_mr_erase(struct util_mr * in_mr_h, uint64_t in_key, void ** out_prov_mr)
+int ofi_mr_erase(struct util_mr * in_mr_h, uint64_t in_key)
 {
     util_mr_itr itr;
     util_mr_item_t * item;
-    
-    itr = util_map_find(in_mr_h->map_handle, (void *)in_key);
+   
+    if(!in_mr_h)
+        return -FI_EINVAL;
+ 
+    itr = util_map_find(in_mr_h->map_handle, &in_key);
 
     if(!itr)
         return -FI_EINVAL; 
@@ -156,7 +169,8 @@ int ofi_mr_erase(struct util_mr * in_mr_h, uint64_t in_key, void ** out_prov_mr)
     util_map_return_keyvalue(in_mr_h->map_handle, itr, (void **)&in_key, 
                                 (void **) &item);
 
-    *out_prov_mr = item->context; /* user should free this item */
+    assert(item);
+
     free((void *)item->mr_iov);
     free(item); 
 
@@ -174,11 +188,12 @@ static int compare_mr_keys(void *key1, void *key2)
 }
 
 
-struct util_mr * util_mr_init(enum fi_mr_mode mode)
+struct util_mr * ofi_mr_init(enum fi_mr_mode mode)
 {
     struct util_mr * new_mr = malloc(sizeof(struct util_mr)); /*dc*/
 
-    /* FI_MR_SCALABLE vs FI_MR_BASIC */
+    assert((mode == FI_MR_SCALABLE) || (mode == FI_MR_BASIC));
+
     new_mr->mr_type = mode; 
 
     new_mr->map_handle = util_map_init(compare_mr_keys); 
@@ -189,10 +204,20 @@ struct util_mr * util_mr_init(enum fi_mr_mode mode)
 }
 
 
-int util_mr_close(struct util_mr ** in_mr_h)
+int ofi_mr_close(struct util_mr **in_mr_h)
 {
-    util_map_delete_map((*in_mr_h)->map_handle);
-    free(*in_mr_h);
+    struct util_mr *mr_h = NULL;
+
+    assert(in_mr_h);
+
+    mr_h = *in_mr_h;
+
+    assert(mr_h);
+
+    util_map_delete_map(mr_h->map_handle);
+    free(mr_h);
+
+    in_mr_h = NULL;
 
     return 0;
 }

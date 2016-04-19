@@ -330,6 +330,7 @@ extern void * util_map_init(int(*Compare)(void *a, void *b));
 extern void util_map_return_keyvalue(void *map_handle, void *map_itr, void **key, 
                             void **value);
 extern void * util_map_find(void * map_handle, void *key);
+/* WARNING: provider MUST copy over fi_mr_attr->context before insert use */
 extern int util_map_insert(void *map_handle, void *key, void *value);
 extern int util_map_erase(void * map_handle, void * map_itr);
 extern void util_map_delete_map(void * map_handle);
@@ -350,11 +351,10 @@ extern int ofi_mr_insert(struct util_mr * in_mr_h,
                                 const struct fi_mr_attr *in_attr, 
                                 uint64_t * out_key, void * in_prov_mr);
 extern int ofi_mr_retrieve(struct util_mr * in_mr_h, ssize_t in_len,
-                                void * in_addr, uint64_t in_key, 
+                                uintptr_t *io_addr, uint64_t in_key, 
                                 uint64_t in_access, void **out_prov_mr);
-extern int ofi_mr_erase(struct util_mr * in_mr_h, uint64_t in_key, 
-                            void ** out_prov_mr);
-extern int ofi_mr_close(struct util_mr ** in_mr_h);
+extern int ofi_mr_erase(struct util_mr * in_mr_h, uint64_t in_key); 
+extern int ofi_mr_close(struct util_mr **in_mr_h);
 
 
 
