@@ -56,6 +56,7 @@
 #include <fi_signal.h>
 #include <fi_enosys.h>
 #include <fi_osd.h>
+#include <rbtree.h>
 
 #ifndef _FI_UTIL_H_
 #define _FI_UTIL_H_
@@ -338,6 +339,29 @@ struct util_event {
 
 int ofi_eq_create(struct fid_fabric *fabric, struct fi_eq_attr *attr,
 		 struct fid_eq **eq_fid, void *context);
+
+/*
+ * MR
+ */
+
+
+/*hide addr related info & store prov_mr ptr */
+struct ofi_util_mr {
+    void *map_handle;
+    uint64_t b_key; /* track available key (BASIC usage) */
+    enum fi_mr_mode mr_type;
+};
+
+int ofi_mr_init(enum fi_mr_mode mode, struct ofi_util_mr ** out_new_mr);
+int ofi_mr_insert(struct ofi_util_mr * in_mr_h,
+                                const struct fi_mr_attr *in_attr,
+                                uint64_t * out_key, void * in_prov_mr);
+int ofi_mr_retrieve(struct ofi_util_mr * in_mr_h, ssize_t in_len,
+                                uintptr_t *io_addr, uint64_t in_key,
+                                uint64_t in_access, void **out_prov_mr);
+int ofi_mr_erase(struct ofi_util_mr * in_mr_h, uint64_t in_key);
+void ofi_mr_close(struct ofi_util_mr *in_mr_h);
+
 
 
 /*
