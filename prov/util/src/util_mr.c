@@ -69,18 +69,22 @@ static uint64_t get_mr_key(struct ofi_util_mr *mr_h)
     return mr_h->b_key++;
 }
 
-static int verify_addr(struct fi_mr_attr * item, uint64_t in_access,
+static int verify_addr(struct ofi_util_mr * in_mr, struct fi_mr_attr * item, uint64_t in_access,
                                  uint64_t in_addr, ssize_t in_len)
 {
     int i = 0;
     uint64_t start = (uint64_t)item->mr_iov[i].iov_base;
     uint64_t end = start + item->mr_iov[i].iov_len;
 
-    if(!in_addr)
+    if(!in_addr) {
+        FI_DBG(in_mr->prov, FI_LOG_MR, "verify_addr: input address to is zero\n");
         return -FI_EINVAL;
+    }
 
-    if((in_access & item->access) != in_access)
+    if((in_access & item->access) != in_access) {
+        FI_DBG(in_mr->prov, FI_LOG_MR, "verify_addr: requested access is not valid\n");
         return -FI_EACCES;
+    }
 
       for (i = 0; i < item->iov_count; i++) {
         if (start <= in_addr && end >= (in_addr + in_len))
@@ -150,7 +154,7 @@ int ofi_mr_retrieve(struct ofi_util_mr * in_mr_h, ssize_t in_len,
     if(in_mr_h->mr_type == FI_MR_SCALABLE)
         *io_addr = (*io_addr) + item->offset;
 
-    err = verify_addr(item, in_access, *io_addr, in_len);
+    err = verify_addr(in_mr_h, item, in_access, *io_addr, in_len);
     if(err)
        return err;
 
@@ -193,7 +197,8 @@ static int compare_mr_keys(void *key1, void *key2)
 }
 
 
-int ofi_mr_init(enum fi_mr_mode mode, struct ofi_util_mr ** out_new_mr)
+int ofi_mr_init(const struct fi_provider *in_prov, enum fi_mr_mode mode,
+                struct ofi_util_mr ** out_new_mr)
 {
     struct ofi_util_mr * new_mr = malloc(sizeof(struct ofi_util_mr));
     if(!new_mr)
@@ -209,6 +214,8 @@ int ofi_mr_init(enum fi_mr_mode mode, struct ofi_util_mr ** out_new_mr)
 
     new_mr->b_key = 0;
 
+    new_mr->prov = in_prov;
+
     (*out_new_mr) = new_mr;
 
     return 0;
@@ -217,7 +224,10 @@ int ofi_mr_init(enum fi_mr_mode mode, struct ofi_util_mr ** out_new_mr)
 
 void ofi_mr_close(struct ofi_util_mr *in_mr_h)
 {
-    assert(in_mr_h);
+    if(!in_mr_h) {
+        FI_WARN(in_mr_h->prov, FI_LOG_MR, "util mr_close: received NULL input\n");
+        return;
+    }
 
     rbtDelete(in_mr_h->map_handle);
     free(in_mr_h);

@@ -470,7 +470,7 @@ int sock_domain(struct fid_fabric *fabric, struct fi_info *info,
 	else
 		sock_domain->attr = sock_domain_attr;
 
-	ret = ofi_mr_init(sock_domain->attr.mr_mode, &sock_domain->mr_heap);
+	ret = ofi_mr_init(&sock_prov, sock_domain->attr.mr_mode, &sock_domain->mr_heap);
 	if (!ret) {
 		return ret;
 	}

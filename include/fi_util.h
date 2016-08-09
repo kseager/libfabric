@@ -350,9 +350,11 @@ struct ofi_util_mr {
     void *map_handle;
     uint64_t b_key; /* track available key (BASIC usage) */
     enum fi_mr_mode mr_type;
+    const struct fi_provider *prov;
 };
 
-int ofi_mr_init(enum fi_mr_mode mode, struct ofi_util_mr ** out_new_mr);
+int ofi_mr_init(const struct fi_provider *in_prov, enum fi_mr_mode mode,
+                                struct ofi_util_mr ** out_new_mr);
 int ofi_mr_insert(struct ofi_util_mr * in_mr_h,
                                 const struct fi_mr_attr *in_attr,
                                 uint64_t * out_key, void * in_prov_mr);
