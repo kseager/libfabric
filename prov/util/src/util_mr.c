@@ -124,41 +124,49 @@ int ofi_mr_insert(struct ofi_util_mr * in_mr_h, const struct fi_mr_attr *in_attr
     return 0;
 }
 
-/* io_addr is address of buff (&buf) */
-int ofi_mr_retrieve(struct ofi_util_mr * in_mr_h, ssize_t in_len,
-                                uintptr_t *io_addr, uint64_t in_key,
-                                uint64_t in_access, void **out_prov_mr)
+static void * mr_retrieve_item(struct ofi_util_mr * in_mr_h,  uint64_t in_key)
 {
-    /*grab info */
     void * itr;
     struct fi_mr_attr * item;
-    int err = 0;
-
-    assert(io_addr);
 
     itr = rbtFind(in_mr_h->map_handle, &in_key);
 
-    if(!itr)
-        return -FI_ENOKEY;
+    if (!itr)
+        return NULL;
 
     rbtKeyValue(in_mr_h->map_handle, itr, (void **)&in_key,
                                 (void **) &item);
 
+    return item;
+}
+
+void * ofi_mr_retrieve(struct ofi_util_mr * in_mr_h,  uint64_t in_key)
+{
+    struct fi_mr_attr * item = mr_retrieve_item(in_mr_h, in_key);
+    return item->context;
+}
+
+/* io_addr is address of buff (&buf) */
+int ofi_mr_retrieve_and_verify(struct ofi_util_mr * in_mr_h, ssize_t in_len,
+                                uintptr_t *io_addr, uint64_t in_key,
+                                uint64_t in_access, void **out_prov_mr)
+{
+    int ret = 0;
+    struct fi_mr_attr * item = mr_retrieve_item(in_mr_h, in_key);
     /*return providers MR struct */
-    if(!item)
+    if (!item || !io_addr)
         return -FI_EINVAL;
 
-    (*out_prov_mr) = item->context;
+    if (out_prov_mr)
+        (*out_prov_mr) = item->context;
 
     /*offset for scalable */
-    if(in_mr_h->mr_type == FI_MR_SCALABLE)
+    if (in_mr_h->mr_type == FI_MR_SCALABLE)
         *io_addr = (*io_addr) + item->offset;
 
-    err = verify_addr(in_mr_h, item, in_access, *io_addr, in_len);
-    if(err)
-       return err;
+    ret = verify_addr(in_mr_h, item, in_access, *io_addr, in_len);
 
-    return 0;
+    return ret;
 }
 
 int ofi_mr_erase(struct ofi_util_mr * in_mr_h, uint64_t in_key)

@@ -238,7 +238,7 @@ struct sock_mr *sock_mr_verify_key(struct sock_domain *domain, uint64_t key,
 
 	fastlock_acquire(&domain->lock);
 
-	err = ofi_mr_retrieve(domain->mr_heap, len, buf, key, access, (void **)&mr);
+	err = ofi_mr_retrieve_and_verify(domain->mr_heap, len, buf, key, access, (void **)&mr);
 
 	if(err != 0) {
 		SOCK_LOG_ERROR("MR check failed\n");

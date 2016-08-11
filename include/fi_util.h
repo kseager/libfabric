@@ -358,7 +358,8 @@ int ofi_mr_init(const struct fi_provider *in_prov, enum fi_mr_mode mode,
 int ofi_mr_insert(struct ofi_util_mr * in_mr_h,
                                 const struct fi_mr_attr *in_attr,
                                 uint64_t * out_key, void * in_prov_mr);
-int ofi_mr_retrieve(struct ofi_util_mr * in_mr_h, ssize_t in_len,
+void * ofi_mr_retrieve(struct ofi_util_mr * in_mr_h, uint64_t in_key);
+int ofi_mr_retrieve_and_verify(struct ofi_util_mr * in_mr_h, ssize_t in_len,
                                 uintptr_t *io_addr, uint64_t in_key,
                                 uint64_t in_access, void **out_prov_mr);
 int ofi_mr_erase(struct ofi_util_mr * in_mr_h, uint64_t in_key);
